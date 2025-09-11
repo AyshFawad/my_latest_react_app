@@ -3,16 +3,16 @@ import {useDebounce} from 'react-use';
 import './App.css'
 import Search from './Components/Search'
 import MovieCard from './Components/MovieCard';
+import { getTrendingMovies, updateSearhCount } from './appwrite.js';
 const API_BASE_URL ="https://api.themoviedb.org/3";
 
-const API_KEY = import.meta.env.VITE_TMBD_API_KEY;
-console.log(API_KEY);
+const API_KEY = import.meta.env.VITE_TMBD_API_KEY
 
 const API_OPTIONS ={
   method: 'GET',
   headers: {
     accept: 'application/json',
-    Authorization : 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlMWFjMzA5ZjAxYjNkNjk5ZDhlZWExMDY1MTM3M2IxNiIsIm5iZiI6MTc1NzM3MTIwOS4xMTMsInN1YiI6IjY4YmY1YjQ5ODU3YjkxYTRjMThjZjkwZSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.75zHm4RwpSX8nsY7licSk2-CJT8F3bzp8Ee9JzbNfvU'
+    Authorization : `Bearer ${API_KEY}`
   }
 
 }
@@ -22,10 +22,10 @@ function App() {
   const [movieList, setMovieList] = useState ([]);
   const [isLoading, setIsLoading] = useState(false);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  
-  useDebounce(() => setDebouncedSearchTerm(searchTerm),500, [searchTerm]);
-  
-  const fetchMovies = async (query = '') => {
+  const [trendingMovies, setTrendingMovies] = useState([]);
+  useDebounce(() => setDebouncedSearchTerm(searchTerm),1000, [searchTerm]);
+
+  const fetchMovies = async (query = '') => { 
     setIsLoading(true);
     setErrorMessage('');
     try {
@@ -44,7 +44,11 @@ function App() {
         setMovieList ([]);
       }
       setMovieList(data.results || []);
-      console.log(data); 
+      console.log(data.results)
+      if(query && data.results.length > 0){
+        await updateSearhCount(query, data.results[0]);
+      }
+      ; 
     } catch (error) {
       console.error(`Error fetching movies:${error}`);
       setErrorMessage('Error fetching movies. Please try again later');
@@ -53,9 +57,22 @@ function App() {
     }
     
   }
+
+  const loadTrendingMovies = async ()  => {
+    try {
+      const movies = await getTrendingMovies();
+      setTrendingMovies(movies);
+    } catch (error) {
+      console.error(`Error fetching trending movies: ${error}`);
+      }
+  }
   useEffect(()=>{
     fetchMovies(debouncedSearchTerm);
-  },[debouncedSearchTerm])
+    },[debouncedSearchTerm])
+
+  useEffect (() => {
+    loadTrendingMovies();
+  },[]);
   return (
     <main>
     <div className='pattern'></div>
@@ -66,6 +83,21 @@ function App() {
         <h1> Find <span className='text-gradient'> Movies</span> You'll Enjoy without the Hassle </h1>
         <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       </header>
+      {trendingMovies.length > 0 && (
+        <section className = "trending">
+          <h2>Trending Movies</h2>
+
+          <ul>
+            {trendingMovies.map((movie,index)=>(
+             
+              <li key={movie.$id}>
+                <p>{index + 1}</p>
+                <img src = {movie.poster_url} alt={movie.title}/>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className='all-movies'>
         <h2 className='mt-[20px]'>All Movies</h2>
         {isLoading ? (
